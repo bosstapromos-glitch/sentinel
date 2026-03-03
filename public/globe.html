@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SENTINEL — Global Conflict Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#060a0f;--surface:rgba(12,18,26,0.94);--surface2:rgba(16,22,32,0.96);--border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.1);--text:rgba(255,255,255,0.88);--text-dim:rgba(255,255,255,0.4);--text-faint:rgba(255,255,255,0.18);--red:#EF4444;--orange:#F97316;--amber:#FBBF24;--green:#34D399;--blue:#60A5FA;--cyan:#22D3EE;--purple:#A78BFA;--pink:#F472B6;--mono:'JetBrains Mono',monospace;--body:'DM Sans',sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--body)}
+canvas{display:block}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:3px}
+#app{width:100%;height:100%;position:relative}
+
+/* Loading */
+#loading-overlay{position:absolute;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity 0.6s}
+#loading-overlay.done{opacity:0;pointer-events:none}
+.load-spinner{width:32px;height:32px;border:2px solid rgba(255,255,255,0.08);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-text{font-size:11px;color:var(--text-dim);font-family:var(--mono);letter-spacing:0.08em}
+.load-sub{font-size:10px;color:var(--text-faint);font-family:var(--mono)}
+
+/* Header */
+#header{position:absolute;top:0;left:0;right:0;z-index:100;height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:linear-gradient(180deg,rgba(6,10,15,0.96) 0%,rgba(6,10,15,0.7) 80%,transparent 100%);pointer-events:none}
+#header>*{pointer-events:auto}
+.header-left{display:flex;align-items:center;gap:10px}
+.header-right{display:flex;align-items:center;gap:12px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 10px var(--red);animation:pdot 2s ease-in-out infinite}
+@keyframes pdot{0%,100%{opacity:1}50%{opacity:0.4}}
+.logo-text{font-size:15px;font-weight:700;letter-spacing:0.04em;color:#fff}
+.logo-sub{font-size:10px;color:var(--text-dim);font-family:var(--mono)}
+.live-badge{display:flex;align-items:center;gap:5px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pdot 2s ease-in-out infinite}
+.live-label{font-size:9px;color:var(--text-dim);font-family:var(--mono);font-weight:600;letter-spacing:0.1em}
+.timestamp{font-size:10px;color:var(--text-faint);font-family:var(--mono)}
+
+/* Header icon buttons */
+.hdr-btn{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:5px;padding:5px 9px;font-size:12px;cursor:pointer;color:var(--text-dim);transition:all 0.2s;font-family:var(--mono);display:flex;align-items:center;gap:5px}
+.hdr-btn:hover{background:rgba(255,255,255,0.08);color:var(--text);border-color:var(--border2)}
+.hdr-btn.active{background:rgba(96,165,250,0.1);border-color:rgba(96,165,250,0.3);color:var(--blue)}
+
+/* Ticker */
+#ticker{position:absolute;top:48px;left:0;right:0;z-index:90;height:28px;display:flex;align-items:center;gap:10px;padding:0 20px;overflow:hidden;background:linear-gradient(90deg,rgba(239,68,68,0.06) 0%,rgba(6,10,15,0.5) 100%);border-bottom:1px solid rgba(239,68,68,0.08);pointer-events:none}
+.ticker-tag{font-size:9px;color:var(--red);font-family:var(--mono);font-weight:700;letter-spacing:0.08em;flex-shrink:0}
+.ticker-text{font-size:11px;color:rgba(255,255,255,0.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Search bar */
+#search-bar{position:absolute;top:82px;left:50%;transform:translateX(-50%);z-index:95;width:360px}
+#search-input{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 14px 9px 34px;font-size:12px;color:#fff;outline:none;font-family:var(--body);backdrop-filter:blur(16px);transition:border-color 0.2s}
+#search-input:focus{border-color:rgba(96,165,250,0.4)}
+#search-input::placeholder{color:var(--text-faint)}
+#search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text-dim);pointer-events:none}
+#search-results{position:absolute;top:42px;left:0;right:0;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;max-height:200px;overflow-y:auto;display:none;backdrop-filter:blur(16px)}
+.search-item{padding:9px 14px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background 0.15s;display:flex;justify-content:space-between;align-items:center}
+.search-item:hover{background:rgba(255,255,255,0.05)}
+.search-item:last-child{border-bottom:none}
+.search-cc{font-size:9px;color:var(--text-faint);font-family:var(--mono)}
+
+/* Stats strip */
+#stats{position:absolute;top:82px;left:20px;z-index:80;display:flex;gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 4px;backdrop-filter:blur(12px)}
+.stat-item{display:flex;align-items:center;gap:5px;padding:0 8px}
+.stat-label{font-size:7px;color:var(--text-faint);font-family:var(--mono);font-weight:600;letter-spacing:0.1em}
+.stat-value{font-size:13px;font-weight:700;font-family:var(--mono)}
+.stat-divider{width:1px;height:16px;background:var(--border)}
+
+/* Filter bar */
+#filter-bar{position:absolute;top:82px;right:20px;z-index:80;display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.fbtn{padding:5px 10px;font-size:9px;font-family:var(--mono);font-weight:600;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);cursor:pointer;backdrop-filter:blur(12px);transition:all 0.2s;white-space:nowrap}
+.fbtn:hover{border-color:rgba(255,255,255,0.12);color:var(--text)}
+.fbtn.active{border-color:rgba(96,165,250,0.4);background:rgba(96,165,250,0.1);color:var(--blue)}
+.fbtn.iran-active{border-color:rgba(239,68,68,0.4);background:rgba(239,68,68,0.1);color:#FCA5A5}
+.fbtn.heatmap-active{border-color:rgba(249,115,22,0.4);background:rgba(249,115,22,0.1);color:var(--orange)}
+
+/* Tooltip */
+#tooltip{position:absolute;z-index:150;pointer-events:none;background:rgba(8,12,18,0.95);border:1px solid var(--border);border-radius:6px;padding:10px 14px;max-width:280px;backdrop-filter:blur(12px);display:none;box-shadow:0 8px 32px rgba(0,0,0,0.5)}
+.tt-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;font-family:var(--mono);margin-bottom:4px}
+.tt-headline{font-size:12px;color:var(--text);line-height:1.35;margin-bottom:6px}
+.tt-meta{font-size:10px;color:var(--text-dim);font-family:var(--mono);display:flex;gap:8px;align-items:center}
+.tt-badge{font-size:9px;padding:2px 6px;border-radius:3px;font-family:var(--mono);font-weight:600}
+.tt-hint{font-size:9px;color:var(--text-faint);font-family:var(--mono);margin-top:5px}
+
+/* Side panels (shared) */
+.side-panel{position:absolute;top:0;bottom:0;width:400px;z-index:200;background:linear-gradient(180deg,rgba(8,12,18,0.98) 0%,rgba(10,16,24,0.98) 100%);display:flex;flex-direction:column;backdrop-filter:blur(20px);transition:transform 0.35s cubic-bezier(0.4,0,0.2,1)}
+.side-panel.left{left:0;border-right:1px solid var(--border);transform:translateX(-100%)}
+.side-panel.right{right:0;border-left:1px solid var(--border);transform:translateX(100%)}
+.side-panel.open{transform:translateX(0)}
+.sp-header{padding:14px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);flex-shrink:0}
+.sp-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;font-family:var(--mono)}
+.sp-close{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:16px;padding:4px 8px;border-radius:4px;transition:all 0.15s}
+.sp-close:hover{background:rgba(255,255,255,0.05);color:#fff}
+.sp-body{flex:1;overflow-y:auto;padding:18px}
+.sp-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.sp-tab{flex:1;padding:10px;font-size:10px;font-family:var(--mono);font-weight:600;text-align:center;cursor:pointer;color:var(--text-dim);border-bottom:2px solid transparent;transition:all 0.2s}
+.sp-tab:hover{color:var(--text)}
+.sp-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+/* Shared UI elements */
+.section-lbl{font-size:9px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.1em;font-family:var(--mono);font-weight:600;margin-bottom:10px}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.info-cell{background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.04);border-radius:5px;padding:8px 10px}
+.info-lbl{font-size:8px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.1em;font-family:var(--mono);font-weight:600;margin-bottom:2px}
+.info-val{font-size:13px;font-weight:600}
+.evidence-item{padding:8px 10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);border-radius:5px;margin-bottom:5px}
+.iran-badge{padding:9px 12px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.12);border-radius:6px;margin-bottom:16px}
+.meta-block{font-size:10px;color:var(--text-faint);font-family:var(--mono);line-height:1.8}
+
+/* Camera card */
+.cam-card{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:10px;cursor:pointer;transition:border-color 0.2s}
+.cam-card:hover{border-color:var(--border2)}
+.cam-thumb{width:100%;height:120px;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.cam-thumb img{width:100%;height:100%;object-fit:cover}
+.cam-live-badge{position:absolute;top:6px;left:6px;padding:2px 6px;background:rgba(239,68,68,0.9);border-radius:3px;font-size:8px;font-family:var(--mono);font-weight:700;color:#fff;letter-spacing:0.08em}
+.cam-info{padding:8px 10px}
+.cam-name{font-size:11px;color:var(--text);margin-bottom:3px}
+.cam-dist{font-size:9px;color:var(--text-dim);font-family:var(--mono)}
+.cam-placeholder{color:var(--text-faint);font-size:24px}
+.cam-player{width:100%;height:200px;background:#000;border-radius:6px;overflow:hidden;margin-bottom:12px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);position:relative}
+.cam-player-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(0,0,0,0.6)}
+.cam-play-btn{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;font-size:18px}
+.cam-play-btn:hover{background:rgba(255,255,255,0.2);border-color:rgba(255,255,255,0.5)}
+.cam-player-note{font-size:9px;color:var(--text-dim);font-family:var(--mono)}
+
+/* Timeline */
+#timeline{position:absolute;bottom:0;left:0;right:0;z-index:100;height:64px;background:linear-gradient(0deg,rgba(6,10,15,0.96) 0%,rgba(6,10,15,0.8) 80%,transparent 100%);display:flex;align-items:center;padding:0 20px;gap:12px;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#timeline.visible{opacity:1;pointer-events:auto}
+.tl-label{font-size:9px;color:var(--text-dim);font-family:var(--mono);font-weight:600;flex-shrink:0;min-width:70px;text-align:center}
+.tl-track{flex:1;height:32px;position:relative;cursor:pointer}
+.tl-bg{position:absolute;top:14px;left:0;right:0;height:4px;background:rgba(255,255,255,0.06);border-radius:2px}
+.tl-fill{position:absolute;top:14px;left:0;height:4px;background:var(--blue);border-radius:2px;transition:width 0.1s}
+.tl-handle{position:absolute;top:8px;width:16px;height:16px;background:var(--blue);border-radius:50%;border:2px solid #fff;transform:translateX(-8px);cursor:grab;box-shadow:0 0 8px rgba(96,165,250,0.4);transition:left 0.1s}
+.tl-bars{position:absolute;top:0;left:0;right:0;bottom:14px;display:flex;align-items:flex-end;gap:1px;pointer-events:none}
+.tl-bar{flex:1;background:rgba(239,68,68,0.25);border-radius:1px 1px 0 0;min-height:1px;transition:height 0.3s}
+.tl-btn{padding:5px 10px;font-size:10px;font-family:var(--mono);font-weight:600;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);cursor:pointer;flex-shrink:0;transition:all 0.2s}
+.tl-btn:hover{color:var(--text);border-color:var(--border2)}
+.tl-btn.playing{background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.3);color:var(--red)}
+
+/* Heatmap canvas overlay */
+#heatmap-canvas{position:absolute;inset:0;pointer-events:none;z-index:3;opacity:0;transition:opacity 0.4s}
+#heatmap-canvas.visible{opacity:0.6}
+
+/* Alert panel */
+.alert-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:5px;margin-bottom:6px}
+.alert-toggle{width:36px;height:20px;border-radius:10px;background:rgba(255,255,255,0.1);border:none;cursor:pointer;position:relative;transition:background 0.2s}
+.alert-toggle.on{background:rgba(96,165,250,0.4)}
+.alert-toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform 0.2s}
+.alert-toggle.on::after{transform:translateX(16px)}
+
+/* Notification toast */
+.toast{position:absolute;top:84px;left:50%;transform:translateX(-50%) translateY(-20px);z-index:300;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 18px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,0.5);backdrop-filter:blur(16px);opacity:0;transition:all 0.3s;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+.toast-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.toast-text{font-size:11px;color:var(--text)}
+.toast-time{font-size:9px;color:var(--text-faint);font-family:var(--mono)}
+
+/* Casualty sparkline */
+.sparkline{display:inline-block;vertical-align:middle}
+
+/* Source status */
+.src-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:5px;margin-bottom:6px}
+.src-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.src-name{font-size:12px;color:var(--text);flex:1}
+.src-meta{font-size:9px;color:var(--text-dim);font-family:var(--mono);text-align:right}
+
+/* Tips modal */
+#tips-modal{position:absolute;inset:0;z-index:500;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+#tips-modal.show{display:flex}
+.tips-box{width:420px;background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:24px;box-shadow:0 16px 64px rgba(0,0,0,0.5)}
+.tips-title{font-size:14px;font-weight:700;margin-bottom:4px}
+.tips-sub{font-size:11px;color:var(--text-dim);margin-bottom:18px}
+.tips-field{margin-bottom:12px}
+.tips-label{font-size:9px;color:var(--text-dim);font-family:var(--mono);font-weight:600;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px}
+.tips-input,.tips-textarea,.tips-select{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:5px;padding:8px 12px;font-size:12px;color:#fff;outline:none;font-family:var(--body);transition:border-color 0.2s}
+.tips-input:focus,.tips-textarea:focus,.tips-select:focus{border-color:rgba(96,165,250,0.4)}
+.tips-textarea{height:80px;resize:vertical}
+.tips-select{appearance:none;cursor:pointer}
+.tips-select option{background:#1a2030}
+.tips-actions{display:flex;gap:8px;margin-top:18px}
+.tips-btn{flex:1;padding:9px;font-size:11px;font-family:var(--mono);font-weight:600;border-radius:5px;border:none;cursor:pointer;transition:all 0.2s}
+.tips-btn.primary{background:var(--blue);color:#000}
+.tips-btn.primary:hover{background:#7cb8ff}
+.tips-btn.secondary{background:rgba(255,255,255,0.05);color:var(--text-dim);border:1px solid var(--border)}
+.tips-btn.secondary:hover{background:rgba(255,255,255,0.08)}
+
+/* Bottom left controls */
+#bottom-left{position:absolute;bottom:20px;left:20px;z-index:80;display:flex;flex-direction:column;gap:8px}
+#legend{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 12px;backdrop-filter:blur(12px)}
+.legend-title{font-size:8px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.1em;font-family:var(--mono);font-weight:600;margin-bottom:6px}
+.legend-items{display:flex;flex-wrap:wrap;gap:3px 12px}
+.legend-item{display:flex;align-items:center;gap:4px}
+.legend-dot{width:5px;height:5px;border-radius:50%}
+.legend-label{font-size:8px;color:var(--text-dim);font-family:var(--mono)}
+
+/* Bottom right controls */
+#bottom-right{position:absolute;bottom:20px;right:20px;z-index:80;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.br-box{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:7px 11px;backdrop-filter:blur(12px)}
+.br-text{font-size:9px;font-family:var(--mono);line-height:1.6}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="loading-overlay"><div class="load-spinner"></div><div class="load-text">SENTINEL</div><div class="load-sub" id="load-status">Loading geographic data...</div></div>
+
+  <!-- Header -->
+  <div id="header">
+    <div class="header-left">
+      <div class="logo-dot"></div>
+      <span class="logo-text">SENTINEL</span>
+      <span class="logo-sub">Global Conflict Monitor</span>
+    </div>
+    <div class="header-right">
+      <button class="hdr-btn" onclick="togglePanel('alerts-panel')" title="Alerts">🔔 <span style="font-size:9px">ALERTS</span></button>
+      <button class="hdr-btn" onclick="togglePanel('sources-panel')" title="Sources">📡 <span style="font-size:9px">SOURCES</span></button>
+      <button class="hdr-btn" onclick="togglePanel('casualty-panel')" title="Casualties">📊 <span style="font-size:9px">TRACKER</span></button>
+      <button class="hdr-btn" onclick="openTipsModal()" title="Submit Tip">💬 <span style="font-size:9px">TIP</span></button>
+      <button class="hdr-btn" onclick="exportReport()" title="Export Report">📄 <span style="font-size:9px">REPORT</span></button>
+      <div class="live-badge"><div class="live-dot"></div><span class="live-label">LIVE</span></div>
+      <span class="timestamp" id="clock"></span>
+    </div>
+  </div>
+
+  <!-- Ticker -->
+  <div id="ticker"><span class="ticker-tag">INCOMING</span><span class="ticker-text" id="ticker-text">Initializing feed...</span></div>
+
+  <!-- Search -->
+  <div id="search-bar">
+    <span id="search-icon">🔍</span>
+    <input id="search-input" type="text" placeholder="Search location — fly to anywhere on the globe..." autocomplete="off"/>
+    <div id="search-results"></div>
+  </div>
+
+  <!-- Stats -->
+  <div id="stats">
+    <div class="stat-item"><span class="stat-label">EVENTS</span><span class="stat-value" style="color:var(--text)" id="stat-total">0</span></div>
+    <div class="stat-divider"></div>
+    <div class="stat-item"><span class="stat-label">VISIBLE</span><span class="stat-value" style="color:var(--blue)" id="stat-visible">0</span></div>
+    <div class="stat-divider"></div>
+    <div class="stat-item"><span class="stat-label">VERIFIED</span><span class="stat-value" style="color:var(--green)" id="stat-verified">0</span></div>
+    <div class="stat-divider"></div>
+    <div class="stat-item"><span class="stat-label">IRAN</span><span class="stat-value" style="color:var(--red)" id="stat-iran">0</span></div>
+  </div>
+
+  <!-- Filters -->
+  <div id="filter-bar">
+    <button class="fbtn active" data-filter="all" onclick="setFilter('all')">ALL</button>
+    <button class="fbtn" data-filter="conflict" onclick="setFilter('conflict')">CONFLICT</button>
+    <button class="fbtn" data-filter="mass_violence" onclick="setFilter('mass_violence')">MASS VIOLENCE</button>
+    <button class="fbtn" data-filter="terror" onclick="setFilter('terror')">TERRORISM</button>
+    <button class="fbtn" data-filter="verified" onclick="setFilter('verified')">VERIFIED</button>
+    <button class="fbtn" data-filter="iran" onclick="setFilter('iran')">IRAN</button>
+    <button class="fbtn" id="heatmap-btn" onclick="toggleHeatmap()">🌡 HEATMAP</button>
+    <button class="fbtn" id="timeline-btn" onclick="toggleTimeline()">⏱ TIMELINE</button>
+    <button class="fbtn" id="camera-btn" onclick="toggleCameras()">📷 CAMERAS</button>
+  </div>
+
+  <!-- Tooltip -->
+  <div id="tooltip"><div class="tt-type" id="tt-type"></div><div class="tt-headline" id="tt-headline"></div><div class="tt-meta"><span class="tt-badge" id="tt-badge"></span><span id="tt-location"></span><span id="tt-time"></span></div><div class="tt-hint">Click to view full report</div></div>
+
+  <!-- Heatmap canvas -->
+  <canvas id="heatmap-canvas"></canvas>
+
+  <!-- Event Panel (left) -->
+  <div id="event-panel" class="side-panel left">
+    <div class="sp-header"><span class="sp-title" id="ep-type"></span><button class="sp-close" onclick="closePanel('event-panel')">✕</button></div>
+    <div class="sp-tabs">
+      <div class="sp-tab active" onclick="switchEPTab(0)">REPORT</div>
+      <div class="sp-tab" onclick="switchEPTab(1)">📷 CAMERAS</div>
+    </div>
+    <div class="sp-body" id="ep-body"></div>
+  </div>
+
+  <!-- Alerts Panel (right) -->
+  <div id="alerts-panel" class="side-panel right">
+    <div class="sp-header"><span class="sp-title" style="color:var(--amber)">🔔 Alert Subscriptions</span><button class="sp-close" onclick="closePanel('alerts-panel')">✕</button></div>
+    <div class="sp-body" id="alerts-body"></div>
+  </div>
+
+  <!-- Sources Panel (right) -->
+  <div id="sources-panel" class="side-panel right">
+    <div class="sp-header"><span class="sp-title" style="color:var(--cyan)">📡 Source Reliability</span><button class="sp-close" onclick="closePanel('sources-panel')">✕</button></div>
+    <div class="sp-body" id="sources-body"></div>
+  </div>
+
+  <!-- Casualty Panel (right) -->
+  <div id="casualty-panel" class="side-panel right">
+    <div class="sp-header"><span class="sp-title" style="color:var(--red)">📊 Casualty Tracker</span><button class="sp-close" onclick="closePanel('casualty-panel')">✕</button></div>
+    <div class="sp-body" id="casualty-body"></div>
+  </div>
+
+  <!-- Tips Modal -->
+  <div id="tips-modal">
+    <div class="tips-box">
+      <div class="tips-title">Submit Anonymous Tip</div>
+      <div class="tips-sub">Help verify or report incidents. Your identity is never stored.</div>
+      <div class="tips-field"><div class="tips-label">Incident Type</div><select class="tips-select" id="tip-type"><option value="">Select type...</option><option value="shooting">Mass Shooting</option><option value="explosion">Explosion</option><option value="attack">Attack</option><option value="protest">Protest</option><option value="other">Other</option></select></div>
+      <div class="tips-field"><div class="tips-label">Location</div><input class="tips-input" id="tip-location" placeholder="City, country or coordinates"/></div>
+      <div class="tips-field"><div class="tips-label">Description</div><textarea class="tips-textarea" id="tip-desc" placeholder="What did you see? When did it happen?"></textarea></div>
+      <div class="tips-field"><div class="tips-label">Photo/Video URL (optional)</div><input class="tips-input" id="tip-media" placeholder="https://..."/></div>
+      <div class="tips-actions">
+        <button class="tips-btn secondary" onclick="closeTipsModal()">Cancel</button>
+        <button class="tips-btn primary" onclick="submitTip()">Submit Tip</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification toast -->
+  <div class="toast" id="toast"><div class="toast-dot" id="toast-dot"></div><span class="toast-text" id="toast-text"></span><span class="toast-time" id="toast-time"></span></div>
+
+  <!-- Timeline -->
+  <div id="timeline">
+    <button class="tl-btn" id="tl-play" onclick="togglePlay()">▶</button>
+    <span class="tl-label" id="tl-start"></span>
+    <div class="tl-track" id="tl-track">
+      <div class="tl-bars" id="tl-bars"></div>
+      <div class="tl-bg"></div>
+      <div class="tl-fill" id="tl-fill"></div>
+      <div class="tl-handle" id="tl-handle"></div>
+    </div>
+    <span class="tl-label" id="tl-end"></span>
+    <button class="tl-btn" onclick="toggleTimeline()">✕</button>
+  </div>
+
+  <!-- Bottom left -->
+  <div id="bottom-left">
+    <div id="legend"><div class="legend-title">Event Types</div><div class="legend-items" id="legend-items"></div></div>
+  </div>
+
+  <!-- Bottom right -->
+  <div id="bottom-right">
+    <div class="br-box"><span class="br-text" style="color:var(--blue)" id="zoom-detail">DETAIL: Countries</span></div>
+    <div class="br-box"><span class="br-text" style="color:var(--amber)">⚠ MVP · Simulated data</span></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════════
+// DATA ENGINE
+// ════════════════════════════════════════════════════════════════
+const ET={battle:{label:'Battle',color:'#EF4444',group:'conflict'},strike:{label:'Strike',color:'#F97316',group:'conflict'},explosion_remote_violence:{label:'Explosion',color:'#DC2626',group:'conflict'},violence_against_civilians:{label:'Violence vs Civilians',color:'#B91C1C',group:'conflict'},mass_shooting:{label:'Mass Shooting',color:'#A78BFA',group:'mass_violence'},terror_attack:{label:'Terror Attack',color:'#BE185D',group:'terror'},mass_casualty_attack:{label:'Mass Casualty',color:'#9333EA',group:'mass_violence'},protest:{label:'Protest',color:'#2563EB',group:'conflict'},strategic_development:{label:'Strategic Dev.',color:'#0891B2',group:'conflict'}};
+const VL={unverified:{label:'Unverified',color:'#FBBF24',bg:'#78350F'},corroborated:{label:'Corroborated',color:'#34D399',bg:'#064E3B'},official_confirmed:{label:'Officially Confirmed',color:'#60A5FA',bg:'#1E3A5F'}};
+const REGIONS=[{name:'Tehran',lat:35.69,lon:51.39,cc:'IR',admin:'Tehran Province'},{name:'Isfahan',lat:32.65,lon:51.67,cc:'IR',admin:'Isfahan Province'},{name:'Tabriz',lat:38.08,lon:46.29,cc:'IR',admin:'East Azerbaijan'},{name:'Shiraz',lat:29.59,lon:52.58,cc:'IR',admin:'Fars Province'},{name:'Baghdad',lat:33.32,lon:44.37,cc:'IQ',admin:'Baghdad Gov.'},{name:'Erbil',lat:36.19,lon:44.01,cc:'IQ',admin:'Erbil Gov.'},{name:'Mosul',lat:36.34,lon:43.13,cc:'IQ',admin:'Nineveh Gov.'},{name:'Beirut',lat:33.89,lon:35.5,cc:'LB',admin:'Beirut'},{name:'Damascus',lat:33.51,lon:36.28,cc:'SY',admin:'Damascus Gov.'},{name:'Aleppo',lat:36.2,lon:37.15,cc:'SY',admin:'Aleppo Gov.'},{name:'Idlib',lat:35.93,lon:36.63,cc:'SY',admin:'Idlib Gov.'},{name:"Sana'a",lat:15.37,lon:44.19,cc:'YE',admin:"Sana'a Gov."},{name:'Aden',lat:12.79,lon:45.02,cc:'YE',admin:'Aden Gov.'},{name:'Marib',lat:15.46,lon:45.33,cc:'YE',admin:'Marib Gov.'},{name:'Gaza City',lat:31.5,lon:34.47,cc:'PS',admin:'Gaza Strip'},{name:'Rafah',lat:31.3,lon:34.25,cc:'PS',admin:'Gaza Strip'},{name:'Khan Younis',lat:31.34,lon:34.3,cc:'PS',admin:'Gaza Strip'},{name:'Kyiv',lat:50.45,lon:30.52,cc:'UA',admin:'Kyiv Oblast'},{name:'Kharkiv',lat:49.99,lon:36.23,cc:'UA',admin:'Kharkiv Oblast'},{name:'Donetsk',lat:48.02,lon:37.8,cc:'UA',admin:'Donetsk Oblast'},{name:'Zaporizhzhia',lat:47.84,lon:35.14,cc:'UA',admin:'Zaporizhzhia Oblast'},{name:'Mariupol',lat:47.1,lon:37.55,cc:'UA',admin:'Donetsk Oblast'},{name:'Kherson',lat:46.64,lon:32.62,cc:'UA',admin:'Kherson Oblast'},{name:'Khartoum',lat:15.5,lon:32.56,cc:'SD',admin:'Khartoum State'},{name:'El Fasher',lat:13.63,lon:25.35,cc:'SD',admin:'North Darfur'},{name:'Mogadishu',lat:2.05,lon:45.32,cc:'SO',admin:'Banaadir'},{name:'Bamako',lat:12.64,lon:-8.0,cc:'ML',admin:'Bamako District'},{name:'Kabul',lat:34.56,lon:69.21,cc:'AF',admin:'Kabul Province'},{name:'Kandahar',lat:31.61,lon:65.71,cc:'AF',admin:'Kandahar Province'},{name:'Tripoli',lat:32.89,lon:13.19,cc:'LY',admin:'Tripolitania'},{name:'Maiduguri',lat:11.83,lon:13.15,cc:'NG',admin:'Borno State'},{name:'Chicago',lat:41.88,lon:-87.63,cc:'US',admin:'Illinois'},{name:'Houston',lat:29.76,lon:-95.37,cc:'US',admin:'Texas'},{name:'Los Angeles',lat:34.05,lon:-118.24,cc:'US',admin:'California'},{name:'Philadelphia',lat:39.95,lon:-75.17,cc:'US',admin:'Pennsylvania'},{name:'Yangon',lat:16.87,lon:96.2,cc:'MM',admin:'Yangon Region'}];
+const PUBS=[{name:'ReliefWeb',tier:'official',status:'online',latency:1200,evts:34},{name:'U.S. Central Command',tier:'official',status:'online',latency:3400,evts:18},{name:'U.S. Dept. of State',tier:'official',status:'online',latency:5200,evts:12},{name:'BBC News',tier:'newsroom',status:'online',latency:800,evts:45},{name:'Reuters',tier:'wire_service',status:'online',latency:600,evts:52},{name:'Associated Press',tier:'wire_service',status:'online',latency:700,evts:48},{name:'ACLED',tier:'curated_dataset',status:'delayed',latency:86400,evts:280},{name:'GDELT',tier:'curated_dataset',status:'online',latency:900,evts:320},{name:'Al Jazeera',tier:'newsroom',status:'online',latency:1100,evts:38},{name:'France 24',tier:'newsroom',status:'degraded',latency:4500,evts:22}];
+const IRAN_TAGS=['iran_state_actor','iran_proxy_actor','iran_targeted','within_iran'];
+const CAMS_DB=[{name:'Tehran Azadi Tower Cam',lat:35.6997,lon:51.338,live:true,src:'windy'},{name:'Tehran Milad Tower',lat:35.7448,lon:51.375,live:true,src:'earthcam'},{name:'Baghdad Green Zone',lat:33.30,lon:44.37,live:false,src:'traffic'},{name:'Kyiv Maidan Square',lat:50.45,lon:30.524,live:true,src:'windy'},{name:'Kyiv Khreshchatyk St.',lat:50.447,lon:30.522,live:true,src:'youtube'},{name:'Beirut Port Area',lat:33.9,lon:35.52,live:false,src:'traffic'},{name:'Chicago Loop Traffic',lat:41.882,lon:-87.627,live:true,src:'dot'},{name:'Chicago I-90/94',lat:41.87,lon:-87.65,live:true,src:'dot'},{name:'Houston I-45 Cam',lat:29.75,lon:-95.36,live:true,src:'dot'},{name:'LA I-110 Downtown',lat:34.04,lon:-118.26,live:true,src:'dot'},{name:'Mogadishu Port',lat:2.04,lon:45.35,live:false,src:'traffic'},{name:'Khartoum Nile Bridge',lat:15.61,lon:32.54,live:false,src:'windy'},{name:'Kabul City Center',lat:34.53,lon:69.17,live:false,src:'traffic'},{name:'Aleppo Citadel Area',lat:36.2,lon:37.16,live:false,src:'traffic'},{name:'Gaza Border Area',lat:31.35,lon:34.27,live:false,src:'traffic'},{name:'Donetsk City',lat:48.01,lon:37.8,live:false,src:'traffic'},{name:'Istanbul Bosphorus',lat:41.04,lon:29.0,live:true,src:'earthcam'},{name:'London Trafalgar Sq',lat:51.508,lon:-0.128,live:true,src:'earthcam'},{name:'NYC Times Square',lat:40.758,lon:-73.986,live:true,src:'earthcam'},{name:'Dubai Burj Khalifa',lat:25.197,lon:55.274,live:true,src:'earthcam'}];
+function R(a){return a[Math.floor(Math.random()*a.length)]}
+function uid(){return'evt_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36)}
+function mkHL(t,l){const T={battle:[`Clashes near ${l}`,`Armed engagement in ${l}`,`Military confrontation near ${l}`],strike:[`Airstrikes target ${l}`,`Drone strike near ${l}`,`Missile attack near ${l}`],explosion_remote_violence:[`Explosions near ${l}`,`Remote detonation in ${l}`,`Blast in ${l}`],violence_against_civilians:[`Civilian casualties in ${l}`,`Attack on civilians near ${l}`],mass_shooting:[`Multiple victims in ${l} shooting`,`Mass shooting in ${l}`],terror_attack:[`Suspected terror attack in ${l}`,`Coordinated attack in ${l}`],mass_casualty_attack:[`Mass casualty event in ${l}`],protest:[`Protests erupt in ${l}`,`Demonstrations in ${l}`],strategic_development:[`Security evolves in ${l}`,`Strategic update: ${l}`]};return R(T[t]||[`Incident near ${l}`])}
+function genEvt(time){const r=R(REGIONS),tK=R(Object.keys(ET)),vK=R(['unverified','corroborated','official_confirmed']),p1=R(PUBS),p2=R(PUBS.filter(p=>p.name!==p1.name)),off=Math.floor(Math.random()*72*3600000),t=new Date(time-off),isIr=r.cc==='IR'||(['IQ','LB','SY','YE','PS'].includes(r.cc)&&Math.random()>0.4),k=['violence','attack','strike','shooting'].some(s=>tK.includes(s))?Math.floor(Math.random()*20):tK==='mass_shooting'?4+Math.floor(Math.random()*10):0,inj=k>0?Math.floor(k*(1+Math.random()*3)):0;return{id:uid(),type:tK,headline:mkHL(tK,r.name),verification:vK,confidence:vK==='official_confirmed'?0.9+Math.random()*0.1:vK==='corroborated'?0.6+Math.random()*0.25:0.2+Math.random()*0.35,lat:r.lat+(Math.random()-0.5)*0.5,lon:r.lon+(Math.random()-0.5)*0.5,locality:r.name,cc:r.cc,admin:r.admin,precision:R(['city','neighborhood','admin1']),uncertainty_km:R([1,5,10,25]),time:t.toISOString(),updated:new Date(t.getTime()+Math.random()*3600000).toISOString(),killed:{min:k,max:k+Math.floor(Math.random()*5)},injured:{min:inj,max:inj+Math.floor(Math.random()*8)},iran:isIr?R(IRAN_TAGS):null,evidence:[{pub:p1.name,tier:p1.tier},...(vK!=='unverified'?[{pub:p2.name,tier:p2.tier}]:[])],lane:vK==='unverified'?'fast':'verified'}}
+let allEvents=[];for(let i=0;i<120;i++)allEvents.push(genEvt(Date.now()));allEvents.sort((a,b)=>new Date(b.time)-new Date(a.time));
+function timeAgo(iso){const d=Date.now()-new Date(iso).getTime(),m=Math.floor(d/60000);if(m<1)return'Just now';if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago'}
+
+// ════════════════════════════════════════════════════════════════
+// SEARCH DB
+// ════════════════════════════════════════════════════════════════
+const SEARCH_DB=[...REGIONS,{name:'New York',lat:40.71,lon:-74.01,cc:'US'},{name:'London',lat:51.51,lon:-0.13,cc:'GB'},{name:'Paris',lat:48.86,lon:2.35,cc:'FR'},{name:'Berlin',lat:52.52,lon:13.41,cc:'DE'},{name:'Moscow',lat:55.76,lon:37.62,cc:'RU'},{name:'Tokyo',lat:35.68,lon:139.69,cc:'JP'},{name:'Beijing',lat:39.91,lon:116.4,cc:'CN'},{name:'Delhi',lat:28.61,lon:77.21,cc:'IN'},{name:'São Paulo',lat:-23.55,lon:-46.63,cc:'BR'},{name:'Cairo',lat:30.04,lon:31.24,cc:'EG'},{name:'Istanbul',lat:41.01,lon:28.98,cc:'TR'},{name:'Seoul',lat:37.57,lon:126.98,cc:'KR'},{name:'Dubai',lat:25.2,lon:55.27,cc:'AE'},{name:'Singapore',lat:1.35,lon:103.82,cc:'SG'},{name:'Sydney',lat:-33.87,lon:151.21,cc:'AU'},{name:'Nairobi',lat:-1.29,lon:36.82,cc:'KE'},{name:'Johannesburg',lat:-26.2,lon:28.04,cc:'ZA'},{name:'Washington DC',lat:38.91,lon:-77.04,cc:'US'},{name:'San Francisco',lat:37.77,lon:-122.42,cc:'US'},{name:'Riyadh',lat:24.71,lon:46.68,cc:'SA'},{name:'Ankara',lat:39.93,lon:32.86,cc:'TR'},{name:'Tel Aviv',lat:32.08,lon:34.78,cc:'IL'},{name:'Amman',lat:31.95,lon:35.93,cc:'JO'}];
+
+// ════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════
+let currentFilter='all',showHeatmap=false,showTimeline=false,showCamerasOnGlobe=false;
+let tlPlaying=false,tlPosition=1,tlInterval=null;
+let alerts={regions:{IR:true,UA:true,PS:true},types:{strike:true,terror_attack:true,mass_shooting:true}};
+let selectedEvent=null,epTab=0;
+
+// ════════════════════════════════════════════════════════════════
+// THREE.JS GLOBE
+// ════════════════════════════════════════════════════════════════
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,0.1,1000);
+camera.position.set(0,0,3.2);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0x060a0f,1);
+document.getElementById('app').insertBefore(renderer.domElement,document.getElementById('header'));
+const globeGroup=new THREE.Group();scene.add(globeGroup);const GLOBE_R=1;
+globeGroup.add(new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R,96,96),new THREE.MeshPhongMaterial({color:0x080e18,emissive:0x040810,specular:0x1a2a40,shininess:12,transparent:true,opacity:0.95})));
+const atmosMat=new THREE.ShaderMaterial({vertexShader:`varying vec3 vN;void main(){vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,fragmentShader:`varying vec3 vN;void main(){float i=pow(0.64-dot(vN,vec3(0,0,1)),2.5);gl_FragColor=vec4(0.15,0.4,1.0,1.0)*i*0.45;}`,blending:THREE.AdditiveBlending,side:THREE.BackSide,transparent:true});
+globeGroup.add(new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R*1.14,64,64),atmosMat));
+scene.add(new THREE.AmbientLight(0x334466,0.8));const dL=new THREE.DirectionalLight(0x8899bb,0.6);dL.position.set(5,3,5);scene.add(dL);
+const sG=new THREE.BufferGeometry(),sV=[];for(let i=0;i<4000;i++)sV.push((Math.random()-0.5)*120,(Math.random()-0.5)*120,(Math.random()-0.5)*120);
+sG.setAttribute('position',new THREE.Float32BufferAttribute(sV,3));scene.add(new THREE.Points(sG,new THREE.PointsMaterial({color:0xffffff,size:0.05,transparent:true,opacity:0.5})));
+
+function ll2v(lat,lon,r){const phi=(90-lat)*Math.PI/180,theta=(lon+180)*Math.PI/180;return new THREE.Vector3(-r*Math.sin(phi)*Math.cos(theta),r*Math.cos(phi),r*Math.sin(phi)*Math.sin(theta))}
+
+// Geo layers
+const countryG=new THREE.Group(),stateG=new THREE.Group(),cityG=new THREE.Group(),gratG=new THREE.Group(),cameraG=new THREE.Group();
+globeGroup.add(countryG);globeGroup.add(stateG);globeGroup.add(cityG);globeGroup.add(gratG);globeGroup.add(cameraG);
+const countryMat=new THREE.LineBasicMaterial({color:0x3a7cc0,transparent:true,opacity:0.45});
+const stateMat=new THREE.LineBasicMaterial({color:0x2a6090,transparent:true,opacity:0.2});
+const gridMat=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.03});
+for(let lat=-60;lat<=60;lat+=30){const pts=[];const phi=(90-lat)*Math.PI/180;for(let i=0;i<=128;i++){const th=(i/128)*Math.PI*2;pts.push(new THREE.Vector3(-(GLOBE_R+0.001)*Math.sin(phi)*Math.cos(th),(GLOBE_R+0.001)*Math.cos(phi),(GLOBE_R+0.001)*Math.sin(phi)*Math.sin(th)))}gratG.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),gridMat))}
+for(let lon=0;lon<360;lon+=30){const pts=[];const th=lon*Math.PI/180;for(let i=0;i<=128;i++){const phi=(i/128)*Math.PI;pts.push(new THREE.Vector3(-(GLOBE_R+0.001)*Math.sin(phi)*Math.cos(th),(GLOBE_R+0.001)*Math.cos(phi),(GLOBE_R+0.001)*Math.sin(phi)*Math.sin(th)))}gratG.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),gridMat))}
+
+function drawGeo(coords,group,mat,r){if(coords.length<2)return;const pts=[],step=coords.length>500?Math.ceil(coords.length/500):1;for(let i=0;i<coords.length;i+=step){const[lon,lat]=coords[i];pts.push(ll2v(lat,lon,r))}const last=coords[coords.length-1];pts.push(ll2v(last[1],last[0],r));if(pts.length>=2)group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),mat))}
+function processGJ(gj,group,mat,r){(gj.features||[]).forEach(f=>{const g=f.geometry;if(!g)return;if(g.type==='Polygon')g.coordinates.forEach(ring=>drawGeo(ring,group,mat,r));else if(g.type==='MultiPolygon')g.coordinates.forEach(p=>p.forEach(ring=>drawGeo(ring,group,mat,r)));else if(g.type==='LineString')drawGeo(g.coordinates,group,mat,r);else if(g.type==='MultiLineString')g.coordinates.forEach(l=>drawGeo(l,group,mat,r))})}
+
+// Topojson decoder
+function topoFeature(topo,name){const obj=topo.objects[name];if(!obj)return{type:'FeatureCollection',features:[]};const arcs=topo.arcs,tf=topo.transform;function decArc(i){const arc=arcs[i<0?~i:i],c=[];let x=0,y=0;arc.forEach(([dx,dy])=>{x+=dx;y+=dy;let lon=x,lat=y;if(tf){lon=lon*tf.scale[0]+tf.translate[0];lat=lat*tf.scale[1]+tf.translate[1]}c.push([lon,lat])});if(i<0)c.reverse();return c}function decRing(idxs){let c=[];idxs.forEach(i=>{const d=decArc(i);if(c.length>0)d.shift();c=c.concat(d)});return c}function decGeom(g){if(g.type==='Polygon')return{type:'Polygon',coordinates:g.arcs.map(decRing)};if(g.type==='MultiPolygon')return{type:'MultiPolygon',coordinates:g.arcs.map(p=>p.map(decRing))};return g}if(obj.type==='GeometryCollection')return{type:'FeatureCollection',features:obj.geometries.map(g=>({type:'Feature',properties:g.properties||{},geometry:decGeom(g)}))};return{type:'FeatureCollection',features:[{type:'Feature',properties:obj.properties||{},geometry:decGeom(obj)}]}}
+
+// State subdivision lines for key regions
+function addStateSubs(){const regions=[{subs:[[48,39,48,25],[51,39,51,25],[54,39,54,25],[57,39,57,25],[44,37,63,37],[44,34,63,34],[44,31,63,31]]},{subs:[[43,37.5,43,29],[46,37.5,46,29],[39,34,48.5,34],[39,31.5,48.5,31.5]]},{subs:[[38,37,38,32],[40,37,40,32],[35.5,35,42.5,35]]},{subs:[[-104,49,-104,37],[-111,49,-111,37],[-90,49,-90,30],[-82,42,-82,30],[-97,49,-97,26],[-120,49,-120,34],[-125,42,-67,42],[-125,37,-75,37],[-100,33,-80,33]]},{subs:[[26,52.5,26,44.5],[30,52.5,30,44.5],[34,52.5,34,44.5],[22,50,40,50],[22,48,40,48],[22,46,40,46]]},{subs:[[45,19,45,12],[48,19,48,12],[42,16,54,16]]},{subs:[[26,23,26,8],[30,23,30,8],[34,23,34,8],[22,18,38,18],[22,14,38,14]]}];regions.forEach(r=>{r.subs.forEach(s=>{drawGeo([[s[0],s[1]],[s[2],s[3]]],stateG,stateMat,GLOBE_R+0.0025)})})}
+
+// City labels
+const CITIES=[{name:'New York',lat:40.71,lon:-74.01},{name:'London',lat:51.51,lon:-0.13},{name:'Paris',lat:48.86,lon:2.35},{name:'Berlin',lat:52.52,lon:13.41},{name:'Moscow',lat:55.76,lon:37.62},{name:'Tokyo',lat:35.68,lon:139.69},{name:'Beijing',lat:39.91,lon:116.4},{name:'Delhi',lat:28.61,lon:77.21},{name:'Cairo',lat:30.04,lon:31.24},{name:'Istanbul',lat:41.01,lon:28.98},{name:'Dubai',lat:25.2,lon:55.27},{name:'Tehran',lat:35.69,lon:51.39},{name:'Baghdad',lat:33.32,lon:44.37},{name:'Kyiv',lat:50.45,lon:30.52},{name:'Damascus',lat:33.51,lon:36.28},{name:'Kabul',lat:34.56,lon:69.21},{name:'Khartoum',lat:15.5,lon:32.56},{name:'Mogadishu',lat:2.05,lon:45.32},{name:'Tripoli',lat:32.89,lon:13.19},{name:'Gaza City',lat:31.5,lon:34.47},{name:'Chicago',lat:41.88,lon:-87.63},{name:'Los Angeles',lat:34.05,lon:-118.24},{name:'Sydney',lat:-33.87,lon:151.21},{name:'São Paulo',lat:-23.55,lon:-46.63},{name:'Nairobi',lat:-1.29,lon:36.82},{name:'Johannesburg',lat:-26.2,lon:28.04},{name:'Seoul',lat:37.57,lon:126.98},{name:'Singapore',lat:1.35,lon:103.82},{name:'Riyadh',lat:24.71,lon:46.68},{name:'Amman',lat:31.95,lon:35.93},{name:'Beirut',lat:33.89,lon:35.5},{name:'Tel Aviv',lat:32.08,lon:34.78},{name:'Aden',lat:12.79,lon:45.02},{name:"Sana'a",lat:15.37,lon:44.19},{name:'Donetsk',lat:48.02,lon:37.8},{name:'Kharkiv',lat:49.99,lon:36.23}];
+function createCityLabels(){CITIES.forEach(c=>{const cv=document.createElement('canvas'),cx=cv.getContext('2d');cv.width=256;cv.height=64;cx.beginPath();cx.arc(16,32,3,0,Math.PI*2);cx.fillStyle='rgba(180,210,255,0.6)';cx.fill();cx.font='500 20px "DM Sans",sans-serif';cx.fillStyle='rgba(180,210,255,0.65)';cx.textBaseline='middle';cx.fillText(c.name,26,32);const tex=new THREE.CanvasTexture(cv);tex.minFilter=THREE.LinearFilter;const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false,sizeAttenuation:true}));sp.position.copy(ll2v(c.lat,c.lon,GLOBE_R+0.015));sp.scale.set(0.18,0.045,1);cityG.add(sp)})}
+
+// Camera markers on globe
+function createCameraMarkers(){CAMS_DB.forEach(c=>{const cv=document.createElement('canvas'),cx=cv.getContext('2d');cv.width=64;cv.height=64;cx.beginPath();cx.arc(32,32,10,0,Math.PI*2);cx.fillStyle=c.live?'rgba(34,211,238,0.5)':'rgba(34,211,238,0.2)';cx.fill();cx.font='16px serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText('📷',32,32);const tex=new THREE.CanvasTexture(cv);tex.minFilter=THREE.LinearFilter;const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false,sizeAttenuation:true}));sp.position.copy(ll2v(c.lat,c.lon,GLOBE_R+0.02));sp.scale.set(0.06,0.06,1);sp.userData={cam:c};cameraG.add(sp)})}
+
+// Load countries
+async function loadGeo(){try{document.getElementById('load-status').textContent='Loading country boundaries...';const r=await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');const t=await r.json();processGJ(topoFeature(t,'countries'),countryG,countryMat,GLOBE_R+0.002);document.getElementById('load-status').textContent='Loading detailed boundaries...';const r2=await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json');const t2=await r2.json();while(countryG.children.length)countryG.remove(countryG.children[0]);processGJ(topoFeature(t2,'countries'),countryG,countryMat,GLOBE_R+0.002);addStateSubs()}catch(e){console.error(e);document.getElementById('load-status').textContent='Using fallback...'}createCityLabels();createCameraMarkers();setTimeout(()=>document.getElementById('loading-overlay').classList.add('done'),400)}
+loadGeo();
+
+// ════════════════════════════════════════════════════════════════
+// MARKERS
+// ════════════════════════════════════════════════════════════════
+const markerGroup=new THREE.Group();globeGroup.add(markerGroup);
+const markers=[];const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
+function createMarker(evt){const color=new THREE.Color(ET[evt.type].color),pos=ll2v(evt.lat,evt.lon,GLOBE_R+0.008),size=evt.killed.min>10?0.018:evt.killed.min>3?0.014:0.01;const mesh=new THREE.Mesh(new THREE.SphereGeometry(size,12,12),new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.9}));mesh.position.copy(pos);markerGroup.add(mesh);const ring=new THREE.Mesh(new THREE.RingGeometry(size*1.5,size*2.5,24),new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.3,side:THREE.DoubleSide}));ring.position.copy(pos);ring.lookAt(new THREE.Vector3(0,0,0));markerGroup.add(ring);const spkH=evt.killed.min>10?0.06:evt.killed.min>3?0.04:0.02,spike=new THREE.Mesh(new THREE.CylinderGeometry(0.002,0.002,spkH,6),new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.5}));const dir=pos.clone().normalize();spike.position.copy(pos.clone().add(dir.clone().multiplyScalar(spkH/2)));spike.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);markerGroup.add(spike);const m={mesh,ring,spike,event:evt,size,phase:Math.random()*Math.PI*2};mesh.userData={mi:markers.length};markers.push(m);return m}
+allEvents.forEach(e=>createMarker(e));
+
+function passesFilter(e){if(currentFilter==='all')return true;if(currentFilter==='iran')return!!e.iran;if(currentFilter==='verified')return e.lane==='verified';return ET[e.type]?.group===currentFilter}
+function updateVis(){let v=0,ver=0,ir=0;markers.forEach(m=>{const ok=passesFilter(m.event);m.mesh.visible=ok;m.ring.visible=ok;m.spike.visible=ok;if(ok)v++;if(m.event.lane==='verified')ver++;if(m.event.iran)ir++});document.getElementById('stat-total').textContent=allEvents.length;document.getElementById('stat-visible').textContent=v;document.getElementById('stat-verified').textContent=ver;document.getElementById('stat-iran').textContent=ir}
+updateVis();
+
+// ════════════════════════════════════════════════════════════════
+// INTERACTION
+// ════════════════════════════════════════════════════════════════
+let isDragging=false,prevMouse={x:0,y:0},dragDist=0;
+let targetRotY=0.3,targetRotX=0.2,rotY=0.3,rotX=0.2;
+let targetZoom=3.2,currentZoom=3.2,autoRotate=true;
+renderer.domElement.addEventListener('mousedown',e=>{isDragging=true;autoRotate=false;dragDist=0;prevMouse={x:e.clientX,y:e.clientY}});
+window.addEventListener('mousemove',e=>{mouse.x=(e.clientX/innerWidth)*2-1;mouse.y=-(e.clientY/innerHeight)*2+1;if(isDragging){const dx=e.clientX-prevMouse.x,dy=e.clientY-prevMouse.y;dragDist+=Math.abs(dx)+Math.abs(dy);targetRotY+=dx*0.005;targetRotX+=dy*0.005;targetRotX=Math.max(-Math.PI/2.2,Math.min(Math.PI/2.2,targetRotX));prevMouse={x:e.clientX,y:e.clientY}}});
+window.addEventListener('mouseup',()=>{isDragging=false});
+renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();targetZoom+=e.deltaY*0.002;targetZoom=Math.max(1.8,Math.min(6,targetZoom))},{passive:false});
+let touchDist=0;
+renderer.domElement.addEventListener('touchstart',e=>{if(e.touches.length===1){isDragging=true;autoRotate=false;dragDist=0;prevMouse={x:e.touches[0].clientX,y:e.touches[0].clientY}}if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;touchDist=Math.sqrt(dx*dx+dy*dy)}},{passive:true});
+renderer.domElement.addEventListener('touchmove',e=>{if(e.touches.length===1&&isDragging){const dx=e.touches[0].clientX-prevMouse.x,dy=e.touches[0].clientY-prevMouse.y;dragDist+=Math.abs(dx)+Math.abs(dy);targetRotY+=dx*0.005;targetRotX+=dy*0.005;targetRotX=Math.max(-Math.PI/2.2,Math.min(Math.PI/2.2,targetRotX));prevMouse={x:e.touches[0].clientX,y:e.touches[0].clientY}}if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;const d=Math.sqrt(dx*dx+dy*dy);targetZoom-=(d-touchDist)*0.01;targetZoom=Math.max(1.8,Math.min(6,targetZoom));touchDist=d}},{passive:true});
+renderer.domElement.addEventListener('touchend',()=>{isDragging=false});
+
+const tooltip=document.getElementById('tooltip');
+let hoveredMarker=null;
+function doHover(cx,cy){mouse.x=(cx/innerWidth)*2-1;mouse.y=-(cy/innerHeight)*2+1;raycaster.setFromCamera(mouse,camera);const meshes=markers.filter(m=>m.mesh.visible).map(m=>m.mesh);const hits=raycaster.intersectObjects(meshes);if(hits.length>0){const m=markers[hits[0].object.userData.mi];if(m&&m.mesh.visible){hoveredMarker=m;renderer.domElement.style.cursor='pointer';const et=ET[m.event.type],vr=VL[m.event.verification];document.getElementById('tt-type').textContent=et.label;document.getElementById('tt-type').style.color=et.color;document.getElementById('tt-headline').textContent=m.event.headline;const b=document.getElementById('tt-badge');b.textContent=vr.label;b.style.background=vr.bg;b.style.color=vr.color;document.getElementById('tt-location').textContent=m.event.locality;document.getElementById('tt-location').style.color='rgba(255,255,255,0.4)';document.getElementById('tt-time').textContent=timeAgo(m.event.time);document.getElementById('tt-time').style.color='rgba(255,255,255,0.3)';tooltip.style.display='block';tooltip.style.left=Math.min(cx+16,innerWidth-300)+'px';tooltip.style.top=(cy-10)+'px';return}}hoveredMarker=null;renderer.domElement.style.cursor='grab';tooltip.style.display='none'}
+renderer.domElement.addEventListener('mousemove',e=>doHover(e.clientX,e.clientY));
+renderer.domElement.addEventListener('click',e=>{if(dragDist>8)return;if(hoveredMarker){selectedEvent=hoveredMarker.event;epTab=0;openEventPanel()}else{closePanel('event-panel')}});
+
+// ════════════════════════════════════════════════════════════════
+// FILTERS
+// ════════════════════════════════════════════════════════════════
+function setFilter(f){currentFilter=f;document.querySelectorAll('.fbtn[data-filter]').forEach(b=>{b.classList.remove('active','iran-active');if(b.dataset.filter===f)b.classList.add(f==='iran'?'iran-active':'active')});updateVis()}
+
+// ════════════════════════════════════════════════════════════════
+// FLY-TO (Search)
+// ════════════════════════════════════════════════════════════════
+function flyTo(lat,lon,zoom){autoRotate=false;const lonRad=-(lon+180)*Math.PI/180+Math.PI;const latRad=lat*Math.PI/180;targetRotY=lonRad;targetRotX=latRad*0.6;targetZoom=zoom||2.0}
+const searchInput=document.getElementById('search-input'),searchResults=document.getElementById('search-results');
+searchInput.addEventListener('input',()=>{const q=searchInput.value.toLowerCase().trim();if(q.length<2){searchResults.style.display='none';return}const matches=SEARCH_DB.filter(s=>s.name.toLowerCase().includes(q)).slice(0,8);if(matches.length===0){searchResults.style.display='none';return}searchResults.innerHTML=matches.map(s=>`<div class="search-item" onclick="selectSearch(${s.lat},${s.lon},'${s.name}')">${s.name}<span class="search-cc">${s.cc}</span></div>`).join('');searchResults.style.display='block'});
+searchInput.addEventListener('blur',()=>{setTimeout(()=>searchResults.style.display='none',200)});
+function selectSearch(lat,lon,name){searchInput.value=name;searchResults.style.display='none';flyTo(lat,lon,2.0);showToast(`Flying to ${name}`,'var(--blue)')}
+
+// ════════════════════════════════════════════════════════════════
+// PANELS
+// ════════════════════════════════════════════════════════════════
+function togglePanel(id){const p=document.getElementById(id);document.querySelectorAll('.side-panel').forEach(sp=>{if(sp.id!==id)sp.classList.remove('open')});p.classList.toggle('open');if(p.classList.contains('open')){if(id==='alerts-panel')renderAlerts();if(id==='sources-panel')renderSources();if(id==='casualty-panel')renderCasualties()}}
+function closePanel(id){document.getElementById(id).classList.remove('open')}
+
+// Event Panel
+function openEventPanel(){const p=document.getElementById('event-panel');p.classList.add('open');renderEP()}
+function switchEPTab(t){epTab=t;document.querySelectorAll('#event-panel .sp-tab').forEach((tab,i)=>{tab.classList.toggle('active',i===t)});renderEP()}
+function renderEP(){if(!selectedEvent)return;const e=selectedEvent,et=ET[e.type],vr=VL[e.verification];document.getElementById('ep-type').textContent=et.label;document.getElementById('ep-type').style.color=et.color;const body=document.getElementById('ep-body');
+if(epTab===0){let h=`<div style="font-size:17px;font-weight:700;line-height:1.35;margin:14px 0;color:#fff">${e.headline}</div><div class="info-grid">`;h+=ic('Verification',vr.label,vr.color)+ic('Confidence',Math.round(e.confidence*100)+'%',e.confidence>0.7?'#34D399':e.confidence>0.4?'#FBBF24':'#EF4444')+ic('Location',e.locality,'#fff')+ic('Country',e.cc,'#fff')+ic('Precision',e.precision,'rgba(255,255,255,0.7)')+ic('Uncertainty','±'+e.uncertainty_km+'km','rgba(255,255,255,0.7)')+ic('Killed',e.killed.min+'–'+e.killed.max,'#EF4444')+ic('Injured',e.injured.min+'–'+e.injured.max,'#F97316')+ic('Lane',e.lane==='fast'?'Fast':'Verified',e.lane==='fast'?'#FBBF24':'#34D399')+ic('Reported',timeAgo(e.time),'rgba(255,255,255,0.7)')+'</div>';
+if(e.iran)h+=`<div class="iran-badge"><div class="info-lbl" style="color:#FCA5A5;margin-bottom:3px">IRAN RELEVANCE</div><div class="info-val" style="color:rgba(255,255,255,0.8);font-size:13px">${e.iran.replace(/_/g,' ')}</div></div>`;
+h+=`<div class="section-lbl">Evidence (${e.evidence.length} sources)</div>`;e.evidence.forEach(ev=>{h+=`<div class="evidence-item"><div style="font-size:12px;color:var(--text)">${ev.pub}</div><div style="font-size:10px;color:var(--text-faint);font-family:var(--mono);margin-top:2px">Tier: ${ev.tier.replace(/_/g,' ')}</div></div>`});
+h+=`<div style="margin-top:16px" class="meta-block">Event: ${e.time}<br>Updated: ${e.updated}<br>ID: ${e.id}</div>`;body.innerHTML=h}
+else if(epTab===1){let h='<div class="section-lbl">Nearby Cameras</div>';const nearby=CAMS_DB.filter(c=>{const d=Math.sqrt(Math.pow(c.lat-e.lat,2)+Math.pow(c.lon-e.lon,2));return d<3}).sort((a,b)=>{const da=Math.sqrt(Math.pow(a.lat-e.lat,2)+Math.pow(a.lon-e.lon,2));const db=Math.sqrt(Math.pow(b.lat-e.lat,2)+Math.pow(b.lon-e.lon,2));return da-db});
+if(nearby.length===0)h+='<div style="color:var(--text-dim);font-size:12px;padding:20px 0;text-align:center">No cameras found within 50km of this event.<br><br><span style="font-size:10px;color:var(--text-faint)">Camera coverage varies by region.<br>Windy API key required for live feeds.</span></div>';
+else{const cam=nearby[0];h+=`<div class="cam-player"><img src="https://placehold.co/400x200/0a1020/1a3050?text=${encodeURIComponent('📷 '+cam.name)}" style="width:100%;height:100%;object-fit:cover;opacity:0.5"/><div class="cam-player-overlay"><div class="cam-play-btn">▶</div><div class="cam-player-note">${cam.live?'LIVE FEED AVAILABLE':'LAST IMAGE'}</div><div style="font-size:9px;color:var(--text-faint);font-family:var(--mono)">Requires Windy API key</div></div></div>`;
+nearby.forEach(c=>{const d=Math.sqrt(Math.pow(c.lat-e.lat,2)+Math.pow(c.lon-e.lon,2))*111;h+=`<div class="cam-card"><div class="cam-thumb"><div class="cam-placeholder">📷</div>${c.live?'<div class="cam-live-badge">● LIVE</div>':''}</div><div class="cam-info"><div class="cam-name">${c.name}</div><div class="cam-dist">${d.toFixed(1)}km away · ${c.src} · ${c.live?'Streaming':'Static'}</div></div></div>`})}
+h+=`<div style="margin-top:16px;padding:12px;background:rgba(34,211,238,0.05);border:1px solid rgba(34,211,238,0.12);border-radius:6px"><div class="section-lbl" style="color:var(--cyan);margin-bottom:6px">Integration Ready</div><div style="font-size:11px;color:var(--text-dim);line-height:1.6">This panel connects to:<br>• <b>Windy Webcams API</b> — 65K+ worldwide cameras<br>• <b>TrafficVision</b> — 135K+ DOT traffic cams<br>• <b>EarthCam</b> — curated HD streams<br>• <b>Helios</b> — enterprise camera network<br><br><span style="font-size:10px;color:var(--text-faint)">Add your API keys in settings to enable live feeds.</span></div></div>`;body.innerHTML=h}}
+function ic(l,v,c){return`<div class="info-cell"><div class="info-lbl">${l}</div><div class="info-val" style="color:${c||'#fff'}">${v}</div></div>`}
+
+// Alerts Panel
+function renderAlerts(){const body=document.getElementById('alerts-body');let h='<div class="section-lbl">Region Alerts</div><div style="font-size:11px;color:var(--text-dim);margin-bottom:14px">Get notified when events fire in these regions.</div>';
+const regions={IR:'Iran',UA:'Ukraine',PS:'Palestine',IQ:'Iraq',SY:'Syria',YE:'Yemen',SD:'Sudan',US:'United States'};
+Object.entries(regions).forEach(([cc,name])=>{const on=alerts.regions[cc]||false;h+=`<div class="alert-row"><div><div style="font-size:12px;color:var(--text)">${name}</div><div style="font-size:9px;color:var(--text-faint);font-family:var(--mono)">${cc}</div></div><button class="alert-toggle ${on?'on':''}" onclick="toggleAlert('region','${cc}',this)"></button></div>`});
+h+='<div class="section-lbl" style="margin-top:20px">Event Type Alerts</div>';
+Object.entries(ET).forEach(([key,t])=>{const on=alerts.types[key]||false;h+=`<div class="alert-row"><div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:${t.color}"></div><div style="font-size:12px;color:var(--text)">${t.label}</div></div><button class="alert-toggle ${on?'on':''}" onclick="toggleAlert('type','${key}',this)"></button></div>`});
+body.innerHTML=h}
+function toggleAlert(kind,key,btn){if(kind==='region'){alerts.regions[key]=!alerts.regions[key]}else{alerts.types[key]=!alerts.types[key]}btn.classList.toggle('on')}
+
+// Sources Panel
+function renderSources(){const body=document.getElementById('sources-body');let h='<div class="section-lbl">Data Source Status</div><div style="font-size:11px;color:var(--text-dim);margin-bottom:14px">Real-time health of ingestion feeds.</div>';
+PUBS.forEach(s=>{const color=s.status==='online'?'var(--green)':s.status==='delayed'?'var(--amber)':'var(--orange)';const latStr=s.latency<1000?(s.latency+'ms'):s.latency<60000?((s.latency/1000).toFixed(1)+'s'):((s.latency/3600).toFixed(0)+'h');h+=`<div class="src-row"><div class="src-dot" style="background:${color}"></div><div class="src-name">${s.name}<div style="font-size:9px;color:var(--text-faint);font-family:var(--mono)">${s.tier.replace(/_/g,' ')}</div></div><div class="src-meta">${s.status.toUpperCase()}<br>${latStr} · ${s.evts} events</div></div>`});
+body.innerHTML=h}
+
+// Casualty Panel
+function renderCasualties(){const body=document.getElementById('casualty-body');let h='<div class="section-lbl">Casualties by Country (72h)</div>';
+const countries={};allEvents.forEach(e=>{if(!countries[e.cc])countries[e.cc]={killed:0,injured:0,events:0,history:[]};countries[e.cc].killed+=e.killed.min;countries[e.cc].injured+=e.injured.min;countries[e.cc].events++;countries[e.cc].history.push(e.killed.min)});
+const sorted=Object.entries(countries).sort((a,b)=>b[1].killed-a[1].killed);
+sorted.forEach(([cc,d])=>{const sparkData=d.history.slice(0,12);const max=Math.max(...sparkData,1);const sparkSvg=`<svg class="sparkline" width="60" height="16" viewBox="0 0 60 16">${sparkData.map((v,i)=>`<rect x="${i*5}" y="${16-v/max*14}" width="4" height="${Math.max(1,v/max*14)}" fill="rgba(239,68,68,0.6)" rx="1"/>`).join('')}</svg>`;
+h+=`<div class="alert-row"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text)">${cc}</div><div style="font-size:9px;color:var(--text-faint);font-family:var(--mono)">${d.events} events</div></div><div style="text-align:center;padding:0 10px">${sparkSvg}</div><div style="text-align:right"><div style="font-size:13px;font-weight:700;color:var(--red);font-family:var(--mono)">${d.killed}</div><div style="font-size:9px;color:var(--text-faint);font-family:var(--mono)">killed</div></div><div style="text-align:right;margin-left:10px"><div style="font-size:13px;font-weight:700;color:var(--orange);font-family:var(--mono)">${d.injured}</div><div style="font-size:9px;color:var(--text-faint);font-family:var(--mono)">injured</div></div></div>`});
+h+=`<div style="margin-top:20px;padding:12px;background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.1);border-radius:6px"><div style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">Total estimated: <b style="color:var(--red)">${sorted.reduce((s,e)=>s+e[1].killed,0)}</b> killed · <b style="color:var(--orange)">${sorted.reduce((s,e)=>s+e[1].injured,0)}</b> injured</div></div>`;
+body.innerHTML=h}
+
+// ════════════════════════════════════════════════════════════════
+// TIPS MODAL
+// ════════════════════════════════════════════════════════════════
+function openTipsModal(){document.getElementById('tips-modal').classList.add('show')}
+function closeTipsModal(){document.getElementById('tips-modal').classList.remove('show')}
+function submitTip(){closeTipsModal();showToast('Tip submitted for review — thank you','var(--green)');document.getElementById('tip-type').value='';document.getElementById('tip-location').value='';document.getElementById('tip-desc').value='';document.getElementById('tip-media').value=''}
+
+// ════════════════════════════════════════════════════════════════
+// EXPORT REPORT
+// ════════════════════════════════════════════════════════════════
+function exportReport(){const visibleEvents=allEvents.filter(passesFilter).slice(0,20);let text='SENTINEL INTELLIGENCE BRIEFING\n'+new Date().toISOString()+'\n'+'='.repeat(50)+'\n\n';
+text+='SUMMARY: '+allEvents.length+' total events | Filter: '+currentFilter+'\n\n';
+visibleEvents.forEach((e,i)=>{text+=`[${i+1}] ${e.headline}\n    Type: ${ET[e.type].label} | Verification: ${VL[e.verification].label}\n    Location: ${e.locality} (${e.cc}) | Time: ${e.time}\n    Killed: ${e.killed.min}-${e.killed.max} | Injured: ${e.injured.min}-${e.injured.max}\n    Sources: ${e.evidence.map(ev=>ev.pub).join(', ')}\n    ${e.iran?'Iran relevance: '+e.iran:''}\n\n`});
+text+='='.repeat(50)+'\nGenerated by SENTINEL Global Conflict Monitor\nClassification: UNCLASSIFIED // FOR OFFICIAL USE ONLY\n';
+const blob=new Blob([text],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='SENTINEL-Briefing-'+new Date().toISOString().slice(0,10)+'.txt';a.click();URL.revokeObjectURL(url);showToast('Intel briefing exported','var(--blue)')}
+
+// ════════════════════════════════════════════════════════════════
+// HEATMAP
+// ════════════════════════════════════════════════════════════════
+const heatCanvas=document.getElementById('heatmap-canvas');const heatCtx=heatCanvas.getContext('2d');
+function toggleHeatmap(){showHeatmap=!showHeatmap;document.getElementById('heatmap-btn').classList.toggle('heatmap-active',showHeatmap);heatCanvas.classList.toggle('visible',showHeatmap);if(showHeatmap)renderHeatmap()}
+function renderHeatmap(){heatCanvas.width=innerWidth;heatCanvas.height=innerHeight;heatCtx.clearRect(0,0,heatCanvas.width,heatCanvas.height);const visible=allEvents.filter(passesFilter);visible.forEach(e=>{const pos=ll2v(e.lat,e.lon,GLOBE_R+0.01);const projected=pos.clone();globeGroup.localToWorld(projected);projected.project(camera);if(projected.z>1)return;const sx=(projected.x*0.5+0.5)*innerWidth,sy=(-projected.y*0.5+0.5)*innerHeight;const intensity=Math.min(1,(e.killed.min+e.injured.min+5)/30);const radius=30+intensity*40;const grad=heatCtx.createRadialGradient(sx,sy,0,sx,sy,radius);grad.addColorStop(0,`rgba(239,68,68,${intensity*0.4})`);grad.addColorStop(0.5,`rgba(249,115,22,${intensity*0.2})`);grad.addColorStop(1,'rgba(249,115,22,0)');heatCtx.fillStyle=grad;heatCtx.fillRect(sx-radius,sy-radius,radius*2,radius*2)})}
+
+// ════════════════════════════════════════════════════════════════
+// TIMELINE
+// ════════════════════════════════════════════════════════════════
+function toggleTimeline(){showTimeline=!showTimeline;document.getElementById('timeline').classList.toggle('visible',showTimeline);document.getElementById('timeline-btn').classList.toggle('active',showTimeline);if(showTimeline)initTimeline()}
+function initTimeline(){const times=allEvents.map(e=>new Date(e.time).getTime());const minT=Math.min(...times),maxT=Math.max(...times);document.getElementById('tl-start').textContent=new Date(minT).toISOString().slice(5,16).replace('T',' ');document.getElementById('tl-end').textContent=new Date(maxT).toISOString().slice(5,16).replace('T',' ');
+const bars=document.getElementById('tl-bars');const buckets=48;const range=maxT-minT;bars.innerHTML='';for(let i=0;i<buckets;i++){const bStart=minT+range*i/buckets,bEnd=minT+range*(i+1)/buckets;const count=allEvents.filter(e=>{const t=new Date(e.time).getTime();return t>=bStart&&t<bEnd}).length;const h=Math.min(100,count*8);bars.innerHTML+=`<div class="tl-bar" style="height:${h}%"></div>`}
+updateTLPosition()}
+function updateTLPosition(){document.getElementById('tl-fill').style.width=tlPosition*100+'%';document.getElementById('tl-handle').style.left=tlPosition*100+'%';
+const times=allEvents.map(e=>new Date(e.time).getTime());const minT=Math.min(...times),maxT=Math.max(...times);const cutoff=minT+(maxT-minT)*tlPosition;
+markers.forEach(m=>{const t=new Date(m.event.time).getTime();const vis=t<=cutoff&&passesFilter(m.event);m.mesh.visible=vis;m.ring.visible=vis;m.spike.visible=vis})}
+const tlTrack=document.getElementById('tl-track');
+tlTrack.addEventListener('mousedown',e=>{const update=ev=>{const rect=tlTrack.getBoundingClientRect();tlPosition=Math.max(0,Math.min(1,(ev.clientX-rect.left)/rect.width));updateTLPosition()};update(e);const move=ev=>update(ev);const up=()=>{window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up)};window.addEventListener('mousemove',move);window.addEventListener('mouseup',up)});
+function togglePlay(){tlPlaying=!tlPlaying;document.getElementById('tl-play').textContent=tlPlaying?'⏸':'▶';document.getElementById('tl-play').classList.toggle('playing',tlPlaying);if(tlPlaying){if(tlPosition>=0.99)tlPosition=0;tlInterval=setInterval(()=>{tlPosition+=0.005;if(tlPosition>=1){tlPosition=1;tlPlaying=false;document.getElementById('tl-play').textContent='▶';document.getElementById('tl-play').classList.remove('playing');clearInterval(tlInterval)}updateTLPosition()},80)}else{clearInterval(tlInterval)}}
+
+// ════════════════════════════════════════════════════════════════
+// CAMERAS TOGGLE
+// ════════════════════════════════════════════════════════════════
+function toggleCameras(){showCamerasOnGlobe=!showCamerasOnGlobe;cameraG.visible=showCamerasOnGlobe;document.getElementById('camera-btn').classList.toggle('active',showCamerasOnGlobe)}
+cameraG.visible=false;
+
+// ════════════════════════════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════════════════════════════
+function showToast(msg,color){const t=document.getElementById('toast');document.getElementById('toast-text').textContent=msg;document.getElementById('toast-dot').style.background=color||'var(--blue)';document.getElementById('toast-time').textContent=new Date().toISOString().slice(11,19);t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)}
+
+// ════════════════════════════════════════════════════════════════
+// ALERT NOTIFICATIONS (simulated)
+// ════════════════════════════════════════════════════════════════
+function checkAlerts(evt){if(alerts.regions[evt.cc]||alerts.types[evt.type]){showToast(`🚨 ALERT: ${evt.headline}`,ET[evt.type].color)}}
+
+// ════════════════════════════════════════════════════════════════
+// LEGEND + CLOCK + TICKER
+// ════════════════════════════════════════════════════════════════
+const lEl=document.getElementById('legend-items');Object.entries(ET).forEach(([k,v])=>{lEl.innerHTML+=`<div class="legend-item"><div class="legend-dot" style="background:${v.color}"></div><span class="legend-label">${v.label}</span></div>`});
+function updateClock(){document.getElementById('clock').textContent=new Date().toISOString().slice(0,19)+'Z'}updateClock();setInterval(updateClock,1000);
+setInterval(()=>{const evt=genEvt(Date.now());allEvents.unshift(evt);createMarker(evt);if(!showTimeline)updateVis();document.getElementById('ticker-text').textContent=evt.headline+' — '+timeAgo(evt.time);checkAlerts(evt)},7000);
+
+// ════════════════════════════════════════════════════════════════
+// LAYER VISIBILITY BY ZOOM
+// ════════════════════════════════════════════════════════════════
+function updateLayers(z){countryG.visible=true;const ss=z<2.8;stateG.visible=ss;if(ss)stateG.children.forEach(c=>{if(c.material)c.material.opacity=Math.min(0.25,(2.8-z)*0.25)});const sc=z<2.5;cityG.visible=sc;if(sc)cityG.children.forEach(s=>{s.material.opacity=Math.min(0.85,(2.5-z)*1.2);const cs=Math.min(1,(2.5-z)*1.5);s.scale.set(0.18*cs,0.045*cs,1)});const co=0.3+Math.max(0,(3.2-z)*0.15);countryG.children.forEach(c=>{if(c.material)c.material.opacity=Math.min(0.6,co)});let dl='Countries';if(z<2.0)dl='Cities + States';else if(z<2.5)dl='Cities';else if(z<2.8)dl='States';document.getElementById('zoom-detail').textContent='DETAIL: '+dl;
+// Camera markers scale with zoom
+if(showCamerasOnGlobe&&z<2.8){cameraG.children.forEach(s=>{const cs=Math.min(1,(2.8-z)*1.2);s.scale.set(0.06*cs,0.06*cs,1);s.material.opacity=Math.min(0.9,(2.8-z)*1.0)})}
+// Hide city labels on back side
+cityG.children.forEach(sp=>{const pos=sp.position.clone();globeGroup.localToWorld(pos);const center=new THREE.Vector3();globeGroup.getWorldPosition(center);const gd=pos.clone().sub(center).normalize();const cd=camera.position.clone().sub(center).normalize();const f=gd.dot(cd);sp.material.opacity=f>0.1?Math.min(0.85,(2.5-z)*1.2)*f:0})}
+
+// ════════════════════════════════════════════════════════════════
+// RENDER LOOP
+// ════════════════════════════════════════════════════════════════
+const clk=new THREE.Clock();
+function animate(){requestAnimationFrame(animate);const t=clk.getElapsedTime();if(autoRotate)targetRotY+=0.0008;rotY+=(targetRotY-rotY)*0.08;rotX+=(targetRotX-rotX)*0.08;currentZoom+=(targetZoom-currentZoom)*0.08;globeGroup.rotation.y=rotY;globeGroup.rotation.x=rotX;camera.position.z=currentZoom;updateLayers(currentZoom);markers.forEach(m=>{if(!m.mesh.visible)return;const s=1+0.5*Math.sin(t*2+m.phase);m.ring.scale.set(s,s,s);m.ring.material.opacity=0.15+0.15*Math.sin(t*2+m.phase);m.spike.material.opacity=0.3+0.2*Math.sin(t*1.5+m.phase)});markers.forEach(m=>{if(m===hoveredMarker){m.mesh.material.opacity=1;m.mesh.scale.set(1.8,1.8,1.8)}else{m.mesh.material.opacity=0.9;m.mesh.scale.set(1,1,1)}});if(showHeatmap)renderHeatmap();renderer.render(scene,camera)}animate();
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);if(showHeatmap)renderHeatmap()});
+</script>
+</body>
+</html>
