@@ -577,6 +577,6 @@ const clk=new THREE.Clock();
 function animate(){requestAnimationFrame(animate);const t=clk.getElapsedTime();if(autoRotate)targetRotY+=0.0008;rotY+=(targetRotY-rotY)*0.08;rotX+=(targetRotX-rotX)*0.08;currentZoom+=(targetZoom-currentZoom)*0.08;globeGroup.rotation.y=rotY;globeGroup.rotation.x=rotX;camera.position.z=currentZoom;updateLayers(currentZoom);markers.forEach(m=>{if(!m.mesh.visible)return;const s=1+0.5*Math.sin(t*2+m.phase);m.ring.scale.set(s,s,s);m.ring.material.opacity=0.15+0.15*Math.sin(t*2+m.phase);m.spike.material.opacity=0.3+0.2*Math.sin(t*1.5+m.phase)});markers.forEach(m=>{if(m===hoveredMarker){m.mesh.material.opacity=1;m.mesh.scale.set(1.8,1.8,1.8)}else{m.mesh.material.opacity=0.9;m.mesh.scale.set(1,1,1)}});if(showHeatmap)renderHeatmap();renderer.render(scene,camera)}animate();
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);if(showHeatmap)renderHeatmap()});
 </script>
-<script src="missiles.js"></script>
+<script src="military.js"></script>
 </body>
 </html>
