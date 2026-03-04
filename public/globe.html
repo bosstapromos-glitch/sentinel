@@ -559,7 +559,7 @@ function checkAlerts(evt){if(alerts.regions[evt.cc]||alerts.types[evt.type]){sho
 // ════════════════════════════════════════════════════════════════
 const lEl=document.getElementById('legend-items');Object.entries(ET).forEach(([k,v])=>{lEl.innerHTML+=`<div class="legend-item"><div class="legend-dot" style="background:${v.color}"></div><span class="legend-label">${v.label}</span></div>`});
 function updateClock(){document.getElementById('clock').textContent=new Date().toISOString().slice(0,19)+'Z'}updateClock();setInterval(updateClock,1000);
-setInterval(()=>{const evt=genEvt(Date.now());allEvents.unshift(evt);createMarker(evt);if(!showTimeline)updateVis();document.getElementById('ticker-text').textContent=evt.headline+' — '+timeAgo(evt.time);checkAlerts(evt)},7000);
+setInterval(()=>{const evt=genEvt(Date.now());allEvents.unshift(evt);createMarker(evt);if(!showTimeline)updateVis();checkAlerts(evt)},7000);let newsQueue=[];async function loadNews(){try{const r=await fetch('/api/news');const d=await r.json();if(d.articles){d.articles.forEach(a=>{if(a.title&&!a.title.includes('[Removed]'))newsQueue.push(a.title)})}}catch(e){}try{const r2=await fetch('/api/rss');const d2=await r2.json();if(d2.items){d2.items.forEach(i=>{if(i.title)newsQueue.push('📡 '+i.source+': '+i.title)})}}catch(e){}if(newsQueue.length===0)newsQueue.push('Monitoring global feeds...')}loadNews();setInterval(loadNews,300000);let newsIdx=0;setInterval(()=>{if(newsQueue.length>0){document.getElementById('ticker-text').textContent=newsQueue[newsIdx%newsQueue.length];newsIdx++}},5000);
 
 // ════════════════════════════════════════════════════════════════
 // LAYER VISIBILITY BY ZOOM

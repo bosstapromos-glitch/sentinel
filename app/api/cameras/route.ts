@@ -12,24 +12,37 @@ export async function GET(request: Request) {
 
   const key = process.env.WINDY_API_KEY;
   if (!key) {
-    return NextResponse.json({
-      error: 'WINDY_API_KEY not set',
-      hint: 'Get free key at https://api.windy.com/webcams'
-    }, { status: 503 });
+    return NextResponse.json({ error: 'WINDY_API_KEY not set in environment' }, { status: 503 });
   }
 
   try {
-    const res = await fetch(
-      `https://api.windy.com/webcams/api/v3/webcams?` +
-      `nearby=${lat},${lon},${radius}&limit=10&include=images,location,player`,
-      {
-        headers: { 'x-windy-api-key': key },
-        next: { revalidate: 600 }
-      }
-    );
+    const url = `https://api.windy.com/webcams/api/v3/webcams?lang=en&nearby=${lat},${lon},${radius}&include=images,location,player,urls&limit=10`;
+    
+    console.log('Fetching cameras from:', url);
+    console.log('Using key:', key.slice(0, 6) + '...');
+
+    const res = await fetch(url, {
+      headers: {
+        'x-windy-api-key': key,
+      },
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      return NextResponse.json({ 
+        error: 'Windy API error',
+        status: res.status,
+        detail: errorText,
+        keyPrefix: key.slice(0, 6),
+      }, { status: res.status });
+    }
+
     const data = await res.json();
     return NextResponse.json(data);
-  } catch (error) {
-    return NextResponse.json({ error: 'Camera fetch failed' }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ 
+      error: 'Camera fetch failed',
+      detail: error?.message 
+    }, { status: 500 });
   }
 }
