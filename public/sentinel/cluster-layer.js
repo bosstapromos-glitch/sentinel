@@ -68,7 +68,7 @@
       depthWrite: false,
     }));
     sprite.position.copy(ll2v(cluster.latitude, cluster.longitude, GLOBE_R + 0.035));
-    var size = Math.min(0.13, 0.078 + cluster.count * 0.009);
+    var size = Math.min(0.14, 0.09 + cluster.count * 0.01);
     sprite.scale.set(size, size, 1);
     sprite.renderOrder = 5;
     sprite.userData.clusterId = cluster.id;
@@ -180,11 +180,13 @@
     if (dragDist > 8) return;
     var item = clusterAtPointer(event.clientX, event.clientY) || hoveredCluster;
     if (!item) return;
-    event.stopPropagation();
-    var nextZoom = Math.max(1.9, currentZoom - 0.72);
-    flyTo(item.cluster.latitude, item.cluster.longitude, nextZoom);
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    hoveredMarker = null;
+    hoveredCluster = null;
+    flyTo(item.cluster.latitude, item.cluster.longitude, 2.08);
     showToast("Expanding " + item.cluster.count + "-incident cluster", "var(--ops-blue)");
-  });
+  }, true);
 
   var baseUpdateVis = window.updateVis;
   window.updateVis = function updateVisibilityWithClusters() {

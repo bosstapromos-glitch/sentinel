@@ -86,5 +86,14 @@
     },
   });
 
+  if (window.parent && window.parent !== window) {
+    try {
+      window.parent.SentinelGlobe = window.SentinelGlobe;
+      window.parent.SentinelGlobeClustering = window.SentinelGlobeClustering;
+    } catch {
+      // Cross-origin hosts must use postMessage; the current Next.js host is same-origin.
+    }
+  }
+
   window.dispatchEvent(new CustomEvent("sentinel:globe-ready"));
 })();
