@@ -106,7 +106,6 @@
       var dm = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.8 });
       var dp = new THREE.Mesh(new THREE.SphereGeometry(0.003, 4, 4), dm);
       dp.position.copy(pos);
-      var dir = pos.clone().normalize();
       var side = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
       dp.userData.vel = side.multiplyScalar(0.002 + Math.random() * 0.003);
       milGroup.add(dp);
@@ -244,7 +243,7 @@
   }
 
   // ── ANIMATION LOOP ──
-  var missileTimer = setInterval(function () {
+  setInterval(function () {
     // Update missiles
     for (var i = activeMissiles.length - 1; i >= 0; i--) {
       var m = activeMissiles[i];
@@ -259,7 +258,7 @@
             showToast('\uD83D\uDE80 STRIKE IMPACT: ' + m.evt.headline, m.colorHex);
           }
           // Cleanup after delay
-          (function (mm, ii) {
+          (function (mm) {
             setTimeout(function () {
               mm.dead = true;
               milGroup.remove(mm.head); milGroup.remove(mm.glow); milGroup.remove(mm.trail);
@@ -268,7 +267,7 @@
               mm.trail.geometry.dispose(); mm.trail.material.dispose();
               activeMissiles.splice(activeMissiles.indexOf(mm), 1);
             }, 2000);
-          })(m, i);
+          })(m);
         }
         continue;
       }

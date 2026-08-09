@@ -39,10 +39,10 @@ export async function GET(request: Request) {
 
     const data = await res.json();
     return NextResponse.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json({ 
       error: 'Camera fetch failed',
-      detail: error?.message 
+      detail: error instanceof Error ? error.message : 'Unknown camera provider error',
     }, { status: 500 });
   }
 }
