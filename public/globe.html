@@ -578,6 +578,9 @@ const clk=new THREE.Clock();
 function animate(){requestAnimationFrame(animate);const t=clk.getElapsedTime();if(autoRotate)targetRotY+=0.0008;rotY+=(targetRotY-rotY)*0.08;rotX+=(targetRotX-rotX)*0.08;currentZoom+=(targetZoom-currentZoom)*0.08;globeGroup.rotation.y=rotY;globeGroup.rotation.x=rotX;camera.position.z=currentZoom;updateLayers(currentZoom);markers.forEach(m=>{if(!m.mesh.visible)return;const strength=m.ring.userData.pulseStrength||0.6,pulse=Math.max(0,Math.sin(t*1.4+m.phase)),s=1+pulse*0.18*strength;m.ring.scale.set(s,s,s);m.ring.material.opacity=0.06+0.1*pulse*strength;m.spike.material.opacity=0.22+0.12*pulse});markers.forEach(m=>{const base=m.baseScale||1;if(m===hoveredMarker){m.mesh.material.opacity=1;m.mesh.scale.set(base*1.35,base*1.35,base*1.35)}else{m.mesh.material.opacity=0.88;m.mesh.scale.set(base,base,base)}});if(showHeatmap)renderHeatmap();renderer.render(scene,camera)}animate();
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);if(showHeatmap)renderHeatmap()});
 </script>
+<script src="/sentinel/cluster-engine.js"></script>
 <script src="/sentinel-v2.js"></script>
+<script src="/sentinel/cluster-layer.js"></script>
+<script src="/sentinel/globe-adapter.js"></script>
 </body>
 </html>

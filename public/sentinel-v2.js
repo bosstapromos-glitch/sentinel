@@ -147,6 +147,9 @@
       updateVis();
       renderOperationsFeed();
       updatePipeline("INGESTED", payload.total + " structured demo records");
+      window.dispatchEvent(new CustomEvent("sentinel:events-loaded", {
+        detail: { total: payload.total, dataMode: payload.dataMode },
+      }));
     } catch (error) {
       console.error("SENTINEL V2 event load failed:", error);
       updatePipeline("DEGRADED", "Demo provider unavailable");
@@ -238,6 +241,9 @@
     });
     updateVis();
     renderOperationsFeed();
+    window.dispatchEvent(new CustomEvent("sentinel:filter-changed", {
+      detail: { filter: filter },
+    }));
   };
 
   window.updateVis = function updateV2Visibility() {
@@ -313,6 +319,13 @@
     flyTo(marker.event.lat, marker.event.lon, 2.05);
     openEventPanel();
     renderOperationsFeed();
+    window.dispatchEvent(new CustomEvent("sentinel:incident-selected", {
+      detail: {
+        id: marker.event.v2.id,
+        latitude: marker.event.lat,
+        longitude: marker.event.lon,
+      },
+    }));
   };
 
   function dossierHero(event) {
@@ -453,6 +466,9 @@
         button.classList.add("active");
         updateVis();
         renderOperationsFeed();
+        window.dispatchEvent(new CustomEvent("sentinel:timeframe-changed", {
+          detail: { hours: timeframeHours },
+        }));
       });
     });
     document.getElementById("historical-replay").addEventListener("click", function () {
