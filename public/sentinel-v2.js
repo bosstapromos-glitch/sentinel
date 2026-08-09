@@ -67,7 +67,7 @@
   function clockTime(value) {
     try {
       return new Date(value).toISOString().slice(11, 16);
-    } catch (_) {
+    } catch {
       return "--:--";
     }
   }

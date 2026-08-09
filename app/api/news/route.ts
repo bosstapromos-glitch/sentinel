@@ -18,7 +18,7 @@ export async function GET() {
     );
     const data = await res.json();
     return NextResponse.json(data);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'NewsAPI fetch failed' }, { status: 500 });
   }
 }

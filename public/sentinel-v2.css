@@ -123,11 +123,14 @@ body::after {
 .feed-title { color: #e8edf3; font: 700 10px/1 var(--mono); letter-spacing: .1em; }
 .feed-subtitle { margin-top: 4px; color: var(--text-faint); font: 500 8px/1 var(--mono); }
 .feed-collapse {
+  position: absolute;
+  top: 10px;
+  left: -13px;
   width: 25px;
   height: 25px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: rgba(255,255,255,.025);
+  background: rgba(8,13,20,.96);
   color: var(--text-dim);
   cursor: pointer;
 }
