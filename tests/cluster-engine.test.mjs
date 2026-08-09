@@ -1,10 +1,12 @@
-const test = require("node:test");
-const assert = require("node:assert/strict");
+import test from "node:test";
+import assert from "node:assert/strict";
+import clusterEngine from "../public/sentinel/cluster-engine.js";
+
 const {
   clusterEvents,
   gridSizeForDistance,
   normalizeLongitude,
-} = require("../public/sentinel/cluster-engine.js");
+} = clusterEngine;
 
 function event(id, lat, lon, severity = "MODERATE") {
   return {
@@ -39,13 +41,13 @@ test("clusters nearby incidents at global zoom", () => {
   assert.equal(result.singles[0].id, "singapore");
 });
 
-test("averages longitudes correctly across the date line", () => {
+test("normalizes longitudes across the date line", () => {
   const result = clusterEvents([
     event("east", 5, 179),
     event("west", 5, -179),
   ], 5);
 
-  assert.equal(result.clusters.length, 0, "grid cells intentionally remain separate across the wrapped boundary");
+  assert.equal(result.clusters.length, 0, "wrapped boundary cells intentionally remain separate");
   assert.equal(normalizeLongitude(181), -179);
   assert.equal(normalizeLongitude(-181), 179);
 });
